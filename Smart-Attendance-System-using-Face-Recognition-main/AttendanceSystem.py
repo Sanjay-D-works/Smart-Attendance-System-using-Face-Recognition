@@ -65,19 +65,17 @@ while True:
     if len(recognized_names) > 0:
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-        try:
-            with open('attendance.txt', 'r') as file:
-                reader = csv.reader(file)
-                existing_names = set(row[0] for row in reader)
-        except FileNotFoundError:
-            existing_names = set()
+        cursor = mydb.cursor()
 
-        with open('attendance.csv', 'a', newline='') as file:
-            writer = csv.writer(file)
-            for name in recognized_names:
-                if name not in existing_names:
-                    writer.writerow([name, current_time])
-                    existing_names.add(name)
+        for name in recognized_names:
+            cursor.execute(f"SELECT * FROM {today} WHERE name = %s", (name,))
+            result = cursor.fetchone()
+
+            if result is None:
+                sql = f"Insert INTO {today} (name, time) VALUES (%s, %s)"
+                val = (name, current_time)
+                cursor.execute(sql,val)
+                mydb.commit()
 
         attendance_marked = True
 
