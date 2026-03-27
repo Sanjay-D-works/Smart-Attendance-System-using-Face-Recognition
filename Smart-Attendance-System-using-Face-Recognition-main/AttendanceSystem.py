@@ -1,5 +1,5 @@
 import cv2
-import csv
+import mysql.connector
 import os
 import face_recognition
 import datetime
@@ -13,14 +13,38 @@ for filename in os.listdir('image'):
     known_face.append(encoding)
     known_name.append(os.path.splitext(filename)[0])
 
-video_capture = cv2.VideoCapture(0)
+video_capture = cv2.VideoCapture(1)
 
 attendance_marked = False
+
+mydb = mysql.connector.connect(
+    host="localhost",
+    user='root',
+    password="root",
+    database='attendance'
+)
+
+today = datetime.date.today().strftime("%d-%m-%Y")
+
+cursor = mydb.cursor()
+cursor.execute("Show TABlES LIKES %s", (today,))
+result = cursor.fetchone()
+
+if result is None:
+    cursor.execute(f"CREATE TABLE {today} (name VARCHAR(30), time VARCHAR(10))")
+    mydb.commit()
+
+cursor.close()
+
 
 while True:
     ret, frame = video_capture.read()
 
-    rgb_frame = frame[:, :,::-1]
+    if not ret:
+        print("Failed to grab frame")
+        break
+
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     face_locations = face_recognition.face_locations(rgb_frame)
     face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
@@ -40,9 +64,14 @@ while True:
 
     if len(recognized_names) > 0:
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        with open('attendance.txt', 'r') as file:
-            reader = csv.reader(file)
-            existing_names = set(row[0] for row in reader)
+
+        try:
+            with open('attendance.txt', 'r') as file:
+                reader = csv.reader(file)
+                existing_names = set(row[0] for row in reader)
+        except FileNotFoundError:
+            existing_names = set()
+
         with open('attendance.csv', 'a', newline='') as file:
             writer = csv.writer(file)
             for name in recognized_names:
@@ -59,5 +88,6 @@ while True:
 
 video_capture.release()
 cv2.destroyAllWindows()
+
 
 
